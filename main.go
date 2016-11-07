@@ -9,6 +9,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"path/filepath"
 	"runtime"
 	"sync"
 	"syscall"
@@ -43,7 +44,6 @@ var (
 )
 
 func main() {
-
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	flag.Parse()
@@ -66,10 +66,7 @@ func main() {
 	defer logFile.Close()
 	log.SetOutput(logFile)
 
-	err = ioutil.WriteFile(pidFileName, []byte(fmt.Sprint(syscall.Getpid())), 0644)
-	if err != nil {
-		log.Fatalf("error writing pid file [%s]: %s", pidFileName, err.Error())
-	}
+	writePid(pidFileName)
 
 	retentionConfigFile, err := os.Open(retentionConfigFileName)
 	if err != nil {
@@ -151,6 +148,18 @@ func readConfig(configFileName *string) error {
 	graphiteInterval = to.Int64(file.Get("graphite", "interval"))
 	dbID = int(to.Int64(file.Get("redis", "dbid")))
 	return nil
+}
+
+func writePid(filename string) {
+	path := filepath.Dir(filename)
+	if _, err := os.Stat(path); os.IsExist(err) {
+		err = ioutil.WriteFile(filename, []byte(fmt.Sprint(syscall.Getpid())), 0644)
+		if err != nil {
+			log.Fatalf("error writing pid file [%s]: %s", filename, err.Error())
+		}
+	} else {
+		log.Printf("Path %s didn't exists. Skipping pid file creation.", path)
+	}
 }
 
 func serve(l net.Listener, terminate chan bool, wg *sync.WaitGroup) {
